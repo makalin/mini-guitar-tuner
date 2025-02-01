@@ -38,8 +38,8 @@ Before you begin, ensure you have the following installed:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/react-guitar-tuner.git
-cd react-guitar-tuner
+git clone https://github.com/makalin/mini-guitar-tuner.git
+cd mini-guitar-tuner
 ```
 
 2. Install dependencies:
