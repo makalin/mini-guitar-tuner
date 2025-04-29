@@ -2,7 +2,7 @@
 
 A modern, responsive guitar tuner web application built with React and Tailwind CSS. This application supports multiple tuning configurations, features a real-time waveform display, and includes both light and dark themes.
 
-![Guitar Tuner Screenshot](/logo.webp)
+![Guitar Tuner Screenshot](./src/logo.webp)
 
 ## Features
 
