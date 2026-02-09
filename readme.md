@@ -2,6 +2,8 @@
 
 A modern, responsive guitar tuner web application built with React and Tailwind CSS. This application supports multiple tuning configurations, features a real-time waveform display, and includes both light and dark themes.
 
+**[Live on GitHub Pages](https://makalin.github.io/mini-guitar-tuner)**
+
 ![Guitar Tuner Screenshot](./src/logo.webp)
 
 ## Features
