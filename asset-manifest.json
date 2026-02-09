@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/mini-guitar-tuner/static/css/main.bc93916c.css",
+    "main.js": "/mini-guitar-tuner/static/js/main.9f27a3ca.js",
+    "index.html": "/mini-guitar-tuner/index.html",
+    "main.bc93916c.css.map": "/mini-guitar-tuner/static/css/main.bc93916c.css.map",
+    "main.9f27a3ca.js.map": "/mini-guitar-tuner/static/js/main.9f27a3ca.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.bc93916c.css",
+    "static/js/main.9f27a3ca.js"
+  ]
+}
