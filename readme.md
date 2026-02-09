@@ -2,7 +2,7 @@
 
 A modern, responsive guitar tuner web application built with React and Tailwind CSS. This application supports multiple tuning configurations, features a real-time waveform display, and includes both light and dark themes.
 
-**[Live app on GitHub Pages](https://makalin.github.io/mini-guitar-tuner)** — the tuner runs in your browser (not this README).
+**[Live app](https://makalin.github.io/mini-guitar-tuner)**
 
 ![Guitar Tuner Screenshot](./src/logo.webp)
 
@@ -66,24 +66,6 @@ npm start
 # or
 yarn start
 ```
-
-## Deploy to GitHub Pages (so the live link shows the app)
-
-The live URL should serve the **built app**, not the README. Do this once:
-
-1. **Build and push the app to the `gh-pages` branch:**
-   ```bash
-   npm run deploy
-   ```
-   This runs `npm run build` then publishes the `build/` folder to the `gh-pages` branch.
-
-2. **In GitHub, set Pages to use that branch:**
-   - Repo → **Settings** → **Pages**
-   - Under **Build and deployment**, **Source**: choose **Deploy from a branch**
-   - **Branch**: select **gh-pages** and **/ (root)**
-   - Save
-
-After a minute or two, https://makalin.github.io/mini-guitar-tuner/ will show the tuner app. If you still see this README, the source is still set to the default branch (e.g. `main`); switch it to **gh-pages** as above.
 
 ## Usage
 
