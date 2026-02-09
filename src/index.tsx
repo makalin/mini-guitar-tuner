@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import { SettingsProvider } from './context/SettingsContext';
 import GuitarTuner from './guitar-tuner';
 
 const root = ReactDOM.createRoot(
@@ -9,6 +10,8 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <GuitarTuner />
+    <SettingsProvider>
+      <GuitarTuner />
+    </SettingsProvider>
   </React.StrictMode>
 ); 

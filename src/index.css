@@ -1,3 +1,107 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --tuner-bg: #1a1510;
+    --tuner-surface: #2a231c;
+    --tuner-border: #4a4035;
+    --tuner-text: #e8dcc8;
+    --tuner-text-muted: #9a8f7a;
+    --tuner-accent: #d4a84b;
+    --tuner-accent-dim: #8b6914;
+    --tuner-needle: #c9a227;
+    --tuner-in-tune: #4a7c59;
+    --tuner-sharp: #b85450;
+    --tuner-flat: #5a7cb0;
+    --tuner-wave: #d4a84b;
+    --tuner-font-display: 'Georgia', 'Times New Roman', serif;
+    --tuner-font-mono: 'ui-monospace', 'SF Mono', monospace;
+  }
+
+  [data-theme='retro-amber'] {
+    --tuner-bg: #1a1510;
+    --tuner-surface: #2a231c;
+    --tuner-border: #4a4035;
+    --tuner-text: #e8dcc8;
+    --tuner-text-muted: #9a8f7a;
+    --tuner-accent: #d4a84b;
+    --tuner-accent-dim: #8b6914;
+    --tuner-needle: #c9a227;
+    --tuner-in-tune: #4a7c59;
+    --tuner-sharp: #b85450;
+    --tuner-flat: #5a7cb0;
+    --tuner-wave: #d4a84b;
+  }
+
+  [data-theme='retro-crt'] {
+    --tuner-bg: #0d120d;
+    --tuner-surface: #1a221a;
+    --tuner-border: #2a3a2a;
+    --tuner-text: #b8e6b8;
+    --tuner-text-muted: #6a8a6a;
+    --tuner-accent: #7fdf7f;
+    --tuner-accent-dim: #3d6b3d;
+    --tuner-needle: #9fef9f;
+    --tuner-in-tune: #5fcf5f;
+    --tuner-sharp: #df6f6f;
+    --tuner-flat: #6fafdf;
+    --tuner-wave: #7fdf7f;
+  }
+
+  [data-theme='retro-silver'] {
+    --tuner-bg: #181a1c;
+    --tuner-surface: #25282c;
+    --tuner-border: #3d4248;
+    --tuner-text: #d8dce0;
+    --tuner-text-muted: #888c92;
+    --tuner-accent: #a8b4c0;
+    --tuner-accent-dim: #5c646c;
+    --tuner-needle: #c0ccd8;
+    --tuner-in-tune: #58a068;
+    --tuner-sharp: #c05858;
+    --tuner-flat: #5890c0;
+    --tuner-wave: #a8b4c0;
+  }
+
+  [data-theme='retro-rose'] {
+    --tuner-bg: #1c1418;
+    --tuner-surface: #2c2228;
+    --tuner-border: #4a3a42;
+    --tuner-text: #f0dce4;
+    --tuner-text-muted: #9a8290;
+    --tuner-accent: #d890a8;
+    --tuner-accent-dim: #8b5068;
+    --tuner-needle: #e0a0b8;
+    --tuner-in-tune: #608868;
+    --tuner-sharp: #c86878;
+    --tuner-flat: #7890c0;
+    --tuner-wave: #d890a8;
+  }
+
+  [data-theme='retro-ocean'] {
+    --tuner-bg: #0c1418;
+    --tuner-surface: #1a242c;
+    --tuner-border: #2a3842;
+    --tuner-text: #c8e0e8;
+    --tuner-text-muted: #7a929a;
+    --tuner-accent: #58b0c8;
+    --tuner-accent-dim: #2d6878;
+    --tuner-needle: #78c8e0;
+    --tuner-in-tune: #48a068;
+    --tuner-sharp: #d06868;
+    --tuner-flat: #6898c8;
+    --tuner-wave: #58b0c8;
+  }
+
+  html {
+    font-family: var(--tuner-font-display);
+  }
+
+  body {
+    background: var(--tuner-bg);
+    color: var(--tuner-text);
+    min-height: 100vh;
+  }
+}

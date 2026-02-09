@@ -1,276 +1,409 @@
-import React, { useState, useEffect } from 'react';
-import { Mic, Square, Play, Moon, Sun } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Button } from './components/ui/button';
-import { Alert, AlertTitle, AlertDescription } from './components/ui/alert';
-import { Switch } from './components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
-
-const TUNINGS = {
-  'standard': {
-    name: 'Standard (6 String)',
-    notes: [
-      { note: 'E2', freq: 82.41 },
-      { note: 'A2', freq: 110.00 },
-      { note: 'D3', freq: 146.83 },
-      { note: 'G3', freq: 196.00 },
-      { note: 'B3', freq: 246.94 },
-      { note: 'E4', freq: 329.63 }
-    ]
-  },
-  'drop-d': {
-    name: 'Drop D',
-    notes: [
-      { note: 'D2', freq: 73.42 },
-      { note: 'A2', freq: 110.00 },
-      { note: 'D3', freq: 146.83 },
-      { note: 'G3', freq: 196.00 },
-      { note: 'B3', freq: 246.94 },
-      { note: 'E4', freq: 329.63 }
-    ]
-  },
-  '7-string': {
-    name: '7 String',
-    notes: [
-      { note: 'B1', freq: 61.74 },
-      { note: 'E2', freq: 82.41 },
-      { note: 'A2', freq: 110.00 },
-      { note: 'D3', freq: 146.83 },
-      { note: 'G3', freq: 196.00 },
-      { note: 'B3', freq: 246.94 },
-      { note: 'E4', freq: 329.63 }
-    ]
-  },
-  '8-string': {
-    name: '8 String',
-    notes: [
-      { note: 'F#1', freq: 46.25 },
-      { note: 'B1', freq: 61.74 },
-      { note: 'E2', freq: 82.41 },
-      { note: 'A2', freq: 110.00 },
-      { note: 'D3', freq: 146.83 },
-      { note: 'G3', freq: 196.00 },
-      { note: 'B3', freq: 246.94 },
-      { note: 'E4', freq: 329.63 }
-    ]
-  },
-  'bass': {
-    name: 'Bass Guitar',
-    notes: [
-      { note: 'E1', freq: 41.20 },
-      { note: 'A1', freq: 55.00 },
-      { note: 'D2', freq: 73.42 },
-      { note: 'G2', freq: 98.00 }
-    ]
-  }
-};
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Mic, Square, Settings, X, Volume2 } from 'lucide-react';
+import { TUNINGS, TUNING_IDS, DEFAULT_TUNING_ID, type TuningId, type TuningNote } from './constants/tunings';
+import { THEMES, type ThemeId } from './constants/themes';
+import { useSettings } from './context/SettingsContext';
+import { useReferenceTone } from './hooks/useReferenceTone';
 
 const GuitarTuner = () => {
+  const { settings, setTuningId, setTheme, setRefToneVolume, setRefToneDuration, setCalibrationCents, resetSettings } = useSettings();
+  const playTone = useReferenceTone(settings.refToneVolume, settings.refToneDuration, settings.calibrationCents);
+
   const [isListening, setIsListening] = useState(false);
   const [pitch, setPitch] = useState<number | null>(null);
-  const [closestNote, setClosestNote] = useState<{ note: string; freq: number } | null>(null);
+  const [closestNote, setClosestNote] = useState<TuningNote | null>(null);
   const [deviation, setDeviation] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [waveformData, setWaveformData] = useState(new Float32Array(100).fill(0));
-  const [selectedTuning, setSelectedTuning] = useState<keyof typeof TUNINGS>('standard');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const listeningRef = useRef(false);
+  const streamRef = useRef<MediaStream | null>(null);
+  const selectedTuning = TUNINGS[settings.tuningId] ?? TUNINGS[DEFAULT_TUNING_ID];
+  const notes = selectedTuning.notes;
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDarkMode);
-  }, [isDarkMode]);
+    document.documentElement.setAttribute('data-theme', settings.theme);
+  }, [settings.theme]);
 
-  const findClosestNote = (frequency: number) => {
-    const notes = TUNINGS[selectedTuning].notes;
-    let closestNote = notes[0];
-    let minDiff = Math.abs(frequency - notes[0].freq);
+  const findClosestNote = useCallback(
+    (frequency: number) => {
+      let closest = notes[0];
+      let minDiff = Math.abs(frequency - notes[0].freq);
+      notes.forEach((note) => {
+        const diff = Math.abs(frequency - note.freq);
+        if (diff < minDiff) {
+          closest = note;
+          minDiff = diff;
+        }
+      });
+      const dev = ((frequency - closest.freq) / closest.freq) * 100;
+      return { note: closest, deviation: dev };
+    },
+    [notes]
+  );
 
-    notes.forEach(note => {
-      const diff = Math.abs(frequency - note.freq);
-      if (diff < minDiff) {
-        closestNote = note;
-        minDiff = diff;
-      }
-    });
-
-    const deviation = ((frequency - closestNote.freq) / closestNote.freq) * 100;
-    return { note: closestNote, deviation };
-  };
-
-  const handleTuningChange = (value: string) => {
-    setSelectedTuning(value as keyof typeof TUNINGS);
-    setPitch(null);
-    setClosestNote(null);
-    setDeviation(0);
-  };
+  const handleTuningChange = useCallback(
+    (value: string) => {
+      setTuningId(value as TuningId);
+      setPitch(null);
+      setClosestNote(null);
+      setDeviation(0);
+    },
+    [setTuningId]
+  );
 
   const startListening = async () => {
     try {
+      setError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      streamRef.current = stream;
+      listeningRef.current = true;
+      setIsListening(true);
+      const AudioContextClass =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const audioContext = new AudioContextClass();
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
-      
       source.connect(analyser);
       analyser.fftSize = 2048;
-
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Float32Array(bufferLength);
 
       const detectPitch = () => {
+        if (!listeningRef.current) return;
         analyser.getFloatTimeDomainData(dataArray);
-        
         const waveformSamples = new Float32Array(100);
         for (let i = 0; i < 100; i++) {
           waveformSamples[i] = dataArray[Math.floor(i * (bufferLength / 100))];
         }
         setWaveformData(waveformSamples);
-        
         let zeroCrossings = 0;
         for (let i = 1; i < bufferLength; i++) {
-          if (dataArray[i-1] < 0 && dataArray[i] >= 0) {
-            zeroCrossings++;
-          }
+          if (dataArray[i - 1] < 0 && dataArray[i] >= 0) zeroCrossings++;
         }
-
         const frequency = (zeroCrossings * audioContext.sampleRate) / (2 * bufferLength);
-        
-        // Adjust frequency range based on tuning type
-        const minFreq = TUNINGS[selectedTuning].notes[0].freq * 0.8;
-        const maxFreq = TUNINGS[selectedTuning].notes[TUNINGS[selectedTuning].notes.length - 1].freq * 1.2;
-        
+        const minFreq = notes[0].freq * 0.8;
+        const maxFreq = notes[notes.length - 1].freq * 1.2;
         if (frequency > minFreq && frequency < maxFreq) {
           setPitch(Math.round(frequency));
           const { note, deviation } = findClosestNote(frequency);
           setClosestNote(note);
           setDeviation(deviation);
         }
-
-        if (isListening) {
-          requestAnimationFrame(detectPitch);
-        }
+        requestAnimationFrame(detectPitch);
       };
-
-      setIsListening(true);
       detectPitch();
-    } catch (err) {
-      setError("Please allow microphone access to use the tuner.");
+    } catch {
+      setError('Allow microphone access to use the tuner.');
     }
   };
 
   const stopListening = () => {
+    listeningRef.current = false;
     setIsListening(false);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
   };
 
-  const WaveformVisualizer = ({ data }: { data: Float32Array }) => {
-    const points = Array.from(data, (value, index) => {
-      const x = (index / (data.length - 1 || 1)) * 100;
-      const y = 50 + value * 40;
-      return `${x},${y}`;
-    }).join(' ');
-
-    return (
-      <svg className="w-full h-24 bg-gray-100 dark:bg-gray-800 rounded-lg">
-        <polyline
-          points={points}
-          className="stroke-blue-500 dark:stroke-blue-400 fill-none stroke-2"
-        />
-      </svg>
-    );
-  };
+  const needleAngle = Math.max(-45, Math.min(45, deviation * 3));
 
   return (
-    <div className={`min-h-screen p-4 transition-colors ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
-      <div className="fixed top-4 right-4 flex items-center space-x-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-lg">
-        <Sun className="h-4 w-4 dark:text-gray-400" />
-        <Switch
-          checked={isDarkMode}
-          onCheckedChange={setIsDarkMode}
-        />
-        <Moon className="h-4 w-4 dark:text-gray-400" />
-      </div>
+    <div className="min-h-screen p-4 pb-8" style={{ background: 'var(--tuner-bg)', color: 'var(--tuner-text)' }}>
+      {/* Header */}
+      <header className="flex items-center justify-between max-w-lg mx-auto mb-4">
+        <h1 className="text-xl font-semibold tracking-wide" style={{ fontFamily: 'var(--tuner-font-display)' }}>
+          Mini Guitar Tuner
+        </h1>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="p-2 rounded-lg border transition-opacity hover:opacity-80"
+          style={{ borderColor: 'var(--tuner-border)', background: 'var(--tuner-surface)' }}
+          aria-label="Settings"
+        >
+          <Settings className="w-5 h-5" style={{ color: 'var(--tuner-accent)' }} />
+        </button>
+      </header>
 
-      <Card className="w-full max-w-md mx-auto dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-center dark:text-white">Guitar Tuner</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error ? (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-6">
-              <Select value={selectedTuning} onValueChange={handleTuningChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select tuning" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TUNINGS).map(([key, { name }]) => (
-                    <SelectItem key={key} value={key}>{name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Main panel */}
+      <main
+        className="max-w-lg mx-auto rounded-2xl border-2 p-6 shadow-xl"
+        style={{
+          background: 'var(--tuner-surface)',
+          borderColor: 'var(--tuner-border)',
+          boxShadow: '0 0 0 1px var(--tuner-border), 0 25px 50px -12px rgba(0,0,0,0.5)',
+        }}
+      >
+        {error && (
+          <div
+            className="mb-4 p-4 rounded-lg text-sm"
+            style={{ background: 'var(--tuner-sharp)', color: 'var(--tuner-bg)' }}
+          >
+            {error}
+          </div>
+        )}
 
-              <div className="flex justify-center">
-                <Button 
-                  size="lg"
-                  onClick={isListening ? stopListening : startListening}
-                  className="w-32"
-                >
-                  {isListening ? (
-                    <><Square className="mr-2" size={20} /> Stop</>
-                  ) : (
-                    <><Mic className="mr-2" size={20} /> Start</>
-                  )}
-                </Button>
-              </div>
+        {/* Tuning selector */}
+        <div className="mb-6">
+          <label className="block text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--tuner-text-muted)' }}>
+            Instrument & Tuning
+          </label>
+          <select
+            value={settings.tuningId}
+            onChange={(e) => handleTuningChange(e.target.value)}
+            className="w-full py-3 px-4 rounded-lg text-base font-medium focus:outline-none focus:ring-2"
+            style={{
+              background: 'var(--tuner-bg)',
+              border: '2px solid var(--tuner-border)',
+              color: 'var(--tuner-text)',
+            }}
+          >
+            {TUNING_IDS.map((id) => (
+              <option key={id} value={id}>
+                {TUNINGS[id].instrument} — {TUNINGS[id].name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-              {isListening && (
-                <WaveformVisualizer data={waveformData} />
-              )}
+        {/* Listen button */}
+        <div className="flex justify-center mb-6">
+          <button
+            type="button"
+            onClick={isListening ? stopListening : startListening}
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-lg transition-transform active:scale-95"
+            style={{
+              background: isListening ? 'var(--tuner-sharp)' : 'var(--tuner-accent)',
+              color: 'var(--tuner-bg)',
+            }}
+          >
+            {isListening ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isListening ? 'Stop' : 'Listen'}
+          </button>
+        </div>
 
-              {pitch && closestNote && (
-                <div className="text-center space-y-4">
-                  <div>
-                    <div className="text-4xl font-bold mb-2 dark:text-white">{closestNote.note}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {pitch.toFixed(1)} Hz
-                    </div>
-                  </div>
+        {/* Needle meter */}
+        <div
+          className="relative mx-auto mb-6 rounded-xl overflow-hidden"
+          style={{
+            height: 140,
+            background: 'var(--tuner-bg)',
+            border: '2px solid var(--tuner-border)',
+          }}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div
+              className="absolute w-1 rounded-full transition-transform duration-150 origin-bottom"
+              style={{
+                height: '60%',
+                bottom: '50%',
+                background: 'var(--tuner-needle)',
+                transform: `translateX(-50%) rotate(${needleAngle}deg)`,
+                boxShadow: '0 0 8px var(--tuner-needle)',
+              }}
+            />
+          </div>
+          <div className="absolute bottom-2 left-0 right-0 flex justify-between px-4 text-xs" style={{ color: 'var(--tuner-text-muted)' }}>
+            <span>Flat</span>
+            <span className="font-medium" style={{ color: 'var(--tuner-in-tune)' }}>In tune</span>
+            <span>Sharp</span>
+          </div>
+        </div>
 
-                  <div className="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className={`absolute h-full transition-all duration-200 ${
-                        Math.abs(deviation) < 5 ? 'bg-green-500' : 'bg-red-500'
-                      }`}
-                      style={{
-                        left: '50%',
-                        width: '4px',
-                        transform: `translateX(${Math.max(Math.min(deviation * 2, 50), -50)}%)`
-                      }}
-                    />
-                  </div>
-
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {Math.abs(deviation) < 5 ? 'In tune!' : deviation > 0 ? 'Too high' : 'Too low'}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                {TUNINGS[selectedTuning].notes.map(({note, freq}) => (
-                  <div key={note} className="text-center p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                    <div className="font-bold dark:text-white">{note}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{freq.toFixed(2)} Hz</div>
-                  </div>
-                ))}
-              </div>
+        {/* Detected note */}
+        {pitch !== null && closestNote && (
+          <div className="text-center mb-6">
+            <div className="text-4xl font-bold tracking-tight" style={{ color: 'var(--tuner-accent)' }}>
+              {closestNote.note}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="text-sm mt-1" style={{ color: 'var(--tuner-text-muted)' }}>
+              {pitch.toFixed(1)} Hz
+              {Math.abs(deviation) < 5 ? (
+                <span className="ml-2 font-medium" style={{ color: 'var(--tuner-in-tune)' }}>In tune</span>
+              ) : deviation > 0 ? (
+                <span className="ml-2" style={{ color: 'var(--tuner-sharp)' }}>Sharp</span>
+              ) : (
+                <span className="ml-2" style={{ color: 'var(--tuner-flat)' }}>Flat</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Waveform */}
+        {isListening && (
+          <div className="mb-6 rounded-lg overflow-hidden" style={{ background: 'var(--tuner-bg)', border: '1px solid var(--tuner-border)' }}>
+            <svg className="w-full h-20" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline
+                fill="none"
+                stroke="var(--tuner-wave)"
+                strokeWidth="0.5"
+                strokeLinejoin="round"
+                points={Array.from(waveformData, (v, i) => `${(i / (waveformData.length - 1 || 1)) * 100},${50 + v * 30}`).join(' ')}
+              />
+            </svg>
+          </div>
+        )}
+
+        {/* Reference tones — play target pitch per string */}
+        <div className="mb-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Volume2 className="w-4 h-4" style={{ color: 'var(--tuner-accent)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--tuner-text-muted)' }}>
+              Reference tone
+            </span>
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${notes.length}, minmax(0, 1fr))` }}>
+            {notes.map((n, i) => (
+              <button
+                key={`${n.note}-${i}`}
+                type="button"
+                onClick={() => playTone(n.freq)}
+                className="py-3 px-2 rounded-lg font-semibold text-sm transition-transform active:scale-95"
+                style={{
+                  background: 'var(--tuner-bg)',
+                  border: '2px solid var(--tuner-border)',
+                  color: 'var(--tuner-accent)',
+                }}
+              >
+                <span className="block">{n.note}</span>
+                <span className="block text-xs font-normal mt-0.5" style={{ color: 'var(--tuner-text-muted)' }}>
+                  {n.freq.toFixed(0)} Hz
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      {/* Settings modal */}
+      {settingsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border-2 p-6 shadow-2xl"
+            style={{
+              background: 'var(--tuner-surface)',
+              borderColor: 'var(--tuner-border)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold">Settings</h2>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+                className="p-2 rounded-lg hover:opacity-80"
+                style={{ background: 'var(--tuner-bg)' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--tuner-text-muted)' }}>
+                  Theme
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTheme(t.id as ThemeId)}
+                      className="px-4 py-2 rounded-lg text-sm font-medium"
+                      style={{
+                        background: settings.theme === t.id ? 'var(--tuner-accent)' : 'var(--tuner-bg)',
+                        color: settings.theme === t.id ? 'var(--tuner-bg)' : 'var(--tuner-text)',
+                        border: '2px solid var(--tuner-border)',
+                      }}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--tuner-text-muted)' }}>
+                  Reference tone volume
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={settings.refToneVolume}
+                  onChange={(e) => setRefToneVolume(parseFloat(e.target.value))}
+                  className="w-full h-2 rounded-full"
+                  style={{ accentColor: 'var(--tuner-accent)' }}
+                />
+                <span className="text-xs ml-2" style={{ color: 'var(--tuner-text-muted)' }}>
+                  {Math.round(settings.refToneVolume * 100)}%
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--tuner-text-muted)' }}>
+                  Tone duration (sec)
+                </label>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={3}
+                  step={0.25}
+                  value={settings.refToneDuration}
+                  onChange={(e) => setRefToneDuration(parseFloat(e.target.value))}
+                  className="w-full h-2 rounded-full"
+                  style={{ accentColor: 'var(--tuner-accent)' }}
+                />
+                <span className="text-xs ml-2" style={{ color: 'var(--tuner-text-muted)' }}>
+                  {settings.refToneDuration}s
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--tuner-text-muted)' }}>
+                  Calibration (cents, A440 = 0)
+                </label>
+                <input
+                  type="number"
+                  min={-50}
+                  max={50}
+                  value={settings.calibrationCents}
+                  onChange={(e) => setCalibrationCents(parseFloat(e.target.value) || 0)}
+                  className="w-full py-2 px-3 rounded-lg"
+                  style={{
+                    background: 'var(--tuner-bg)',
+                    border: '2px solid var(--tuner-border)',
+                    color: 'var(--tuner-text)',
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetSettings();
+                  setSettingsOpen(false);
+                }}
+                className="w-full py-2 rounded-lg text-sm font-medium"
+                style={{
+                  background: 'var(--tuner-bg)',
+                  border: '2px solid var(--tuner-border)',
+                  color: 'var(--tuner-text-muted)',
+                }}
+              >
+                Reset to defaults
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
