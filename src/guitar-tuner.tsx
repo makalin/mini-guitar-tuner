@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, Square, Play, Moon, Sun } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Button } from './components/ui/button';
+import { Alert, AlertTitle, AlertDescription } from './components/ui/alert';
+import { Switch } from './components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 
 const TUNINGS = {
   'standard': {
@@ -67,19 +67,19 @@ const TUNINGS = {
 
 const GuitarTuner = () => {
   const [isListening, setIsListening] = useState(false);
-  const [pitch, setPitch] = useState(null);
-  const [closestNote, setClosestNote] = useState(null);
+  const [pitch, setPitch] = useState<number | null>(null);
+  const [closestNote, setClosestNote] = useState<{ note: string; freq: number } | null>(null);
   const [deviation, setDeviation] = useState(0);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [waveformData, setWaveformData] = useState(new Float32Array(100).fill(0));
-  const [selectedTuning, setSelectedTuning] = useState('standard');
+  const [selectedTuning, setSelectedTuning] = useState<keyof typeof TUNINGS>('standard');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
 
-  const findClosestNote = (frequency) => {
+  const findClosestNote = (frequency: number) => {
     const notes = TUNINGS[selectedTuning].notes;
     let closestNote = notes[0];
     let minDiff = Math.abs(frequency - notes[0].freq);
@@ -96,8 +96,8 @@ const GuitarTuner = () => {
     return { note: closestNote, deviation };
   };
 
-  const handleTuningChange = (value) => {
-    setSelectedTuning(value);
+  const handleTuningChange = (value: string) => {
+    setSelectedTuning(value as keyof typeof TUNINGS);
     setPitch(null);
     setClosestNote(null);
     setDeviation(0);
@@ -106,7 +106,8 @@ const GuitarTuner = () => {
   const startListening = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioContext = new AudioContextClass();
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
       
@@ -161,9 +162,9 @@ const GuitarTuner = () => {
     setIsListening(false);
   };
 
-  const WaveformVisualizer = ({ data }) => {
-    const points = data.map((value, index) => {
-      const x = (index / (data.length - 1)) * 100;
+  const WaveformVisualizer = ({ data }: { data: Float32Array }) => {
+    const points = Array.from(data, (value, index) => {
+      const x = (index / (data.length - 1 || 1)) * 100;
       const y = 50 + value * 40;
       return `${x},${y}`;
     }).join(' ');
